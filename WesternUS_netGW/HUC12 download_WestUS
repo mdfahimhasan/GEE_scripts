@@ -1,0 +1,35 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var West_geom = 
+    /* color: #d63000 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-126.78879963848898, 49.73555224029821],
+          [-126.78879963848898, 25.31978970204135],
+          [-92.70920979473898, 25.31978970204135],
+          [-92.70920979473898, 49.73555224029821]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var dataset = ee.FeatureCollection('USGS/WBD/2017/HUC12');
+
+var dataset = dataset.filterBounds(West_geom);
+
+// Export the FeatureCollection to a shapefile.
+Export.table.toDrive({
+  collection: dataset,
+  description:'HUC12WestUS',
+  fileFormat: 'SHP'
+});
+
+var visualization = {
+  color: '808080',
+  strokeWidth: 1
+};
+
+dataset = dataset.draw(visualization);
+
+Map.setCenter(-105.861, 39.529, 7);
+Map.addLayer(dataset, null, 'Basins');

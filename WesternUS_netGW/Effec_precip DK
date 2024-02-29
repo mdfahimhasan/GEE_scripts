@@ -1,0 +1,57 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var snake_basin = 
+    /* color: #50d6c9 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      },
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.MultiPolygon(
+        [[[[-115.07347240879255, 40.85051182309983],
+           [-115.07347240879255, 38.689071330149694],
+           [-115.07347240879255, 38.689071330149694],
+           [-115.07347240879255, 40.85051182309983]]],
+         [[[-117.9694013353793, 44.66487770043994],
+           [-117.9694013353793, 41.94737210862421],
+           [-111.2018232103793, 41.94737210862421],
+           [-111.2018232103793, 44.66487770043994]]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//  The ept data asset was taken from David Ketchum. Unit in m/month
+// Note: The data is available from 1987-2021 for months 4-10
+var ept_col = ee.ImageCollection('users/dgketchum/expansion/ept');
+print(ept_col);
+
+var ept = ee.Image('users/dgketchum/expansion/ept/ept_image_full_stack_2016_et_6');
+var ept = ept.multiply(1000);  // converting to mm/month
+var resolution = ept.projection().nominalScale();
+
+print('Native resolution of D. K. Effec precip data is -', resolution, 'm');
+
+var visualization = {
+  min: 0,
+  max: 300,
+  palette: [
+    '9e6212', 'ac7d1d', 'ba9829', 'c8b434', 'd6cf40', 'bed44b', '9fcb51',
+    '80c256', '61b95c', '42b062', '45b677', '49bc8d', '4dc2a2', '51c8b8',
+    '55cece', '4db4ba', '459aa7', '3d8094', '356681', '2d4c6e',
+  ]
+};
+
+Map.addLayer(ept, visualization);
+
+
+// Export.image.toDrive({  
+// image: ept,  
+// description: 'EPT',  
+// scale: 2000,  
+// region: snake_basin,  
+// fileFormat: 'GeoTIFF',  
+// maxPixels: 1e12,  
+// formatOptions: {  
+//     cloudOptimized: true  
+//   }  
+// });  

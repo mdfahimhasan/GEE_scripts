@@ -1,0 +1,106 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var California = 
+    /* color: #d63000 */
+    /* shown: false */
+    ee.Geometry.Polygon(
+        [[[-120.1123977702333, 42.19490086142819],
+          [-120.5518508952333, 42.080846838317164],
+          [-124.4629837077333, 42.11345466243234],
+          [-124.5508743327333, 40.82934619361628],
+          [-124.1993118327333, 39.31618518298596],
+          [-122.3096633952333, 37.071560375937814],
+          [-120.5957962077333, 34.686242675797956],
+          [-119.1895462077333, 34.21515271037994],
+          [-116.9043899577333, 32.638161040746176],
+          [-114.7071243327333, 32.859921508042454],
+          [-114.6192337077333, 34.83065794769293],
+          [-120.0684524577333, 39.14598480930143],
+          [-120.1123977702333, 42.080846838317164]]]),
+    ROI = 
+    /* color: #98ff00 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-121.58560735991215, 36.18732540013477],
+          [-121.58560735991215, 34.502710619279306],
+          [-118.01505071928715, 34.502710619279306],
+          [-118.01505071928715, 36.18732540013477]]], null, false),
+    ROI_non_irrig = 
+    /* color: #0b4a8b */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-116.35366164722909, 38.48224338765963],
+          [-116.35366164722909, 38.22377866729886],
+          [-115.83730422535409, 38.22377866729886],
+          [-115.83730422535409, 38.48224338765963]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var year = 2016;
+//  USDA CDL dataset
+var cdl_dataset = ee.ImageCollection('USDA/NASS/CDL')
+                  .filter(ee.Filter.calendarRange(year,year,'year'))
+                  .first();
+var cdl = cdl_dataset.select('cropland');
+
+// Filtering Fallow land
+var fallow = cdl.eq(61);
+var fallow = fallow.updateMask(fallow);
+
+// Filtering pasture
+var pasture = cdl.eq(176);
+var pasture = pasture.updateMask(pasture);
+
+// Imagecollection filtering
+var irrmap_imcol = ee.ImageCollection('projects/ee-dgketchum/assets/IrrMapper/IrrMapperComp');
+var irrmap = irrmap_imcol.filter(ee.Filter.calendarRange(year,year,'year'))
+    .select('classification').max().rename(['irrigated']);
+
+// In IrrMapper dataset irrigated fields are assigned as 0
+// Converting the irrigated values to 1 and setting others as null
+var no_irrig_mask = irrmap.eq(1);
+
+var irrig_mask = irrmap.eq(0);
+var irrigated = irrmap.updateMask(irrig_mask).remap([0],[1]);
+            
+// Masking out fallow lands that are irrigated
+var fallow_masked = fallow.updateMask(no_irrig_mask);
+
+// Sampling random point over fallow land
+var fallow_pts = fallow_masked.stratifiedSample({
+  numPoints: 5000,
+  region: ROI,
+  seed: 0,
+  classValues: [1],
+  classPoints: [5000],
+  dropNulls: true,
+  geometries: true
+});
+
+
+// Laoding OpenET
+var openET_imcol = ee.ImageCollection("OpenET/ENSEMBLE/CONUS/GRIDMET/MONTHLY/v2_0");
+
+var openET_img = openET_imcol.select('et_ensemble_mad').
+                    filterDate('2016-06-01', '2016-07-01').
+                    sum().multiply(1).toFloat();
+
+// Extract OpenET values at fallow points    
+var pts_ET = openET_img.reduceRegions({
+  collection: fallow_pts,
+  reducer: ee.Reducer.mean()
+});
+print(pts_ET);                  
+
+Map.addLayer(pasture, {min:0, max:1, palette: ['pink']}, 'Pasture', false);
+Map.addLayer(fallow, {min:0, max:1, palette: ['yellow']}, 'Fallow Land Original', false);
+Map.addLayer(fallow_masked, {min:0, max:1, palette: ['blue']}, 'Fallow Land masked with Irrigated');
+Map.addLayer(irrigated, {min:0, max:1, palette: ['green']}, 'Irrigated', false);
+Map.addLayer(pts_ET, {color: 'red'}, 'Pts with natural ET');

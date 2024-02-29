@@ -1,0 +1,91 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var central_valley = 
+    /* color: #35d639 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-119.5352173202384, 35.527259169088445],
+          [-119.5352173202384, 35.303420524847475],
+          [-119.1836548202384, 35.303420524847475],
+          [-119.1836548202384, 35.527259169088445]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//  IrrMapper (irrigated cropland) Data. In IrrMapper, irigated areas are assigned 0 value.
+var year = 2020;
+var irr_imcol = ee.ImageCollection('projects/ee-dgketchum/assets/IrrMapper/IrrMapperComp');
+var irr = irr_imcol.filter(ee.Filter.calendarRange(year,year,'year'))
+                   .select('classification').max().rename(['irrigated']);
+
+var projection_irrmap = irr.projection();
+var projection2km_scale = projection_irrmap.atScale(2000); // from IrrMap
+
+var irrmapper_img = irr.eq(0);
+
+var vis = {min:0, max:1, palette: ['white', 'black']};
+Map.addLayer(irrmapper_img, vis, 'Irrigated fields');
+
+//  USDA CDL dataset
+var cdl_dataset = ee.ImageCollection('USDA/NASS/CDL')
+                  .filter(ee.Filter.date('2020-01-01', '2020-12-31'))
+                  .first();
+var cdl = cdl_dataset.select('cropland');
+
+// List of non-crop pixels
+var noncrop_list = ee.List([0, 60,61, 63,64,65,81, 82,83, 87, 88, 111, 112, 121, 122, 123,
+                            124, 131, 141, 142, 143, 152, 190, 195]);  // 0 is no data value
+
+// Filtering out non-crop pixels
+var cdl_cropland = cdl.remap({
+  from: noncrop_list,
+  to: ee.List.repeat(0, noncrop_list.size()),
+  defaultValue: 1
+});
+
+
+// Extracting rainfed (non-irrigated) croplands
+// Converting 0 values (non-irrigated) to 1 then multiplying with
+// CDL cropland data (reclassified to 1 for croplands and 0 for non-croplands). 
+// The ramaining pixels will be rainfed croplands. Masking it again to remove the 0 values
+var irrmapper_reversed = irrmapper_img.remap([0], [1]);
+var rainfed_cropland_for_IrrMapper = cdl_cropland.multiply(irrmapper_reversed);
+var mask = rainfed_cropland_for_IrrMapper.eq(1);
+
+var rainfed_cropland_for_IrrMapper = rainfed_cropland_for_IrrMapper
+                                          .updateMask(mask)
+                                          .setDefaultProjection({crs: projection_irrmap});
+Map.addLayer(rainfed_cropland_for_IrrMapper, {min:1, max:1, palette: ['black']}, 
+            'rainfed croplands/pastures');
+
+// Open ET Imagecollection
+var openET_imcol = ee.ImageCollection("OpenET/ENSEMBLE/CONUS/GRIDMET/MONTHLY/v2_0");
+var projection_openET = ee.Image(openET_imcol.first()).projection();
+
+var openET_img = openET_imcol.select('et_ensemble_mad').
+                    filterDate('2016-06-01', '2016-07-01').
+                    sum().multiply(1).toFloat().
+                    setDefaultProjection({crs: projection_openET});
+Map.addLayer(openET_img, {}, 'OpenET 30m', false)
+// Multiplying OpenET with Irrmap irrigated data. This will set non-irrigated pixels' ET value to zero
+var cropET_from_openET = openET_img.multiply(rainfed_cropland_for_IrrMapper).clip(central_valley);                    
+// Map.addLayer(cropET_from_openET)
+
+// Summing crop ET from 30m to 2km scale
+var cropET_from_openET = cropET_from_openET.reduceResolution(
+                          {reducer:ee.Reducer.mean(), 
+                            maxPixels: 60000}).
+                            reproject({
+                            crs:projection2km_scale});
+
+// Mapping
+var vis1 = {min:0, max:1, palette: ['yellow', 'blue']};
+var vis2 = {min: 0, max: 1400,  palette: ['9e6212', 'ac7d1d', 'ba9829', 'c8b434', 'd6cf40', 'bed44b', '9fcb51',
+                                          '80c256', '61b95c', '42b062', '45b677', '49bc8d', '4dc2a2', '51c8b8',
+                                          '55cece', '4db4ba', '459aa7', '3d8094', '356681', '2d4c6e']};
+
+// Map.setCenter(-100.55, 40.71, 4);
+Map.addLayer(cdl, {}, 'Crop Landcover', false);
+Map.addLayer(cropET_from_openET, vis2, 'CropET on Rainfed Fields at 2km pixel');
+Map.addLayer(rainfed_cropland_for_IrrMapper, vis1, 'Rainfed cropland IrrMapper Extent');

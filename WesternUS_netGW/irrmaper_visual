@@ -1,0 +1,35 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var central_valley = 
+    /* color: #d63000 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-120.32182399540862, 36.69708062147414],
+          [-120.32182399540862, 35.762142546916536],
+          [-118.94853297978362, 35.762142546916536],
+          [-118.94853297978362, 36.69708062147414]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+
+var year = 2018;
+var irr = ee.ImageCollection('projects/ee-dgketchum/assets/IrrMapper/IrrMapperComp')
+    .filter(ee.Filter.calendarRange(year,year,'year'))
+    .select('classification').max().rename(['irrigated']);
+
+// 0: irrigated; 1: dryland agriculture (entirely rainfed); 
+// 2: uncultivated; 3: wetland 
+var mask = irr.eq(0);
+
+var irr_mask = irr.updateMask(mask).remap([0],[1]);
+
+var vis = {min:1, max:1, palette: ['blue']};
+
+Map.addLayer(irr_mask.clip(central_valley) , vis, year+' IrrMapper Irrigated Extent');
+
+
+
+
+

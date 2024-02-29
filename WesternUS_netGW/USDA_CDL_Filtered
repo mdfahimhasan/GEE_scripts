@@ -1,0 +1,33 @@
+//  USDA CDL dataset
+var cdl_dataset = ee.ImageCollection('USDA/NASS/CDL')
+                  .filter(ee.Filter.date('2016-01-01', '2016-12-31'))
+                  .first();
+var cdl = cdl_dataset.select('cropland');
+
+// List of non-crop pixels
+var noncrop_list = ee.List([60,61, 63,64,65,81, 82,83, 87, 88, 111, 112, 121, 122, 123,
+                            124, 131, 141, 142, 143, 152, 190, 195]);  // 0 is no data value
+
+// Filtering out non-crop pixels
+var cdl_mask = cdl.remap({
+  from: noncrop_list,
+  to: ee.List.repeat(0, noncrop_list.size()),
+  defaultValue:1
+});
+
+var cdl_cropland = cdl.updateMask(cdl_mask);
+
+// Filtering Fallow land
+var fallow = cdl.eq(61);
+var fallow = fallow.updateMask(fallow);
+
+// Filtering cultivated land
+var cdl_cultivated = ee.ImageCollection('USDA/NASS/CDL')
+                  .filter(ee.Filter.date('2016-01-01', '2016-12-31'))
+                  .select('cultivated').first();
+var cdl_cultivated = cdl_cultivated.eq(2);  // only selecting cultivated
+var cdl_cultivated = cdl_cultivated.updateMask(cdl_cultivated);
+
+Map.addLayer(cdl_cropland, {}, 'Crop Landcover', false);
+Map.addLayer(cdl_cultivated, {}, 'Crop cultivated', false);
+Map.addLayer(fallow, {}, 'Fallow Land');

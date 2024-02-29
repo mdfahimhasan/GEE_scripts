@@ -1,0 +1,88 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var central_valley = 
+    /* color: #d63000 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-120.22104291999841, 36.6950098923424],
+          [-120.22104291999841, 36.027049675227595],
+          [-119.37509565437341, 36.027049675227595],
+          [-119.37509565437341, 36.6950098923424]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// Irrmapper Imagecollection
+var year = 2016;
+var irrmap = ee.ImageCollection('projects/ee-dgketchum/assets/IrrMapper/IrrMapperComp').
+              filter(ee.Filter.calendarRange(year, year, 'year')).
+              select('classification').max();
+
+var projection_irrmap = irrmap.projection();
+var projection2km_scale = projection_irrmap.atScale(2000); // from IrrMap
+
+// In IrrMapper dataset irrigated fields are assigned as 0
+// Converting the irrigated values to 1 and setting others as 0
+// var non_irrig_filter = irrmap.eq(0);
+// var irr_mask = non_irrig_filter; 
+// Map.addLayer(irr_mask);
+
+// ############
+// If I just wanted the irrigated pixels, I would have used the following lines
+var non_irrig_mask = irrmap.eq(0);
+var irr_mask = irrmap.updateMask(non_irrig_mask).remap([0], [1]); 
+Map.addLayer(irr_mask);
+// ############
+
+// Open ET Imagecollection
+var openET_imcol = ee.ImageCollection("OpenET/ENSEMBLE/CONUS/GRIDMET/MONTHLY/v2_0");
+var projection_openET = ee.Image(openET_imcol.first()).projection();
+
+// print(projection_openET);
+// print(projection2km_scale);
+
+var openET_img = openET_imcol.select('et_ensemble_mad').
+                    filterDate('2016-06-01', '2016-07-01').
+                    sum().multiply(1).toFloat().
+                    setDefaultProjection({crs: projection_openET});
+
+
+// Multiplying OpenET with Irrmap irrigated data. This will set non-irrigated pixels' ET value to zero
+var cropET_from_openET = openET_img.multiply(irr_mask).clip(central_valley);
+var vis0 = {min: 0, max: 1400,  palette: ['9e6212', 'ac7d1d', 'ba9829', 'c8b434', 'd6cf40', 'bed44b', '9fcb51',
+                                          '80c256', '61b95c', '42b062', '45b677', '49bc8d', '4dc2a2', '51c8b8',
+                                          '55cece', '4db4ba', '459aa7', '3d8094']};
+Map.addLayer(cropET_from_openET, vis0, 'crop ET 30m');
+
+// Summing crop ET from 30m to 2km scale
+var cropET_from_openET = cropET_from_openET.reduceResolution(
+                          {reducer:ee.Reducer.mean(), 
+                            maxPixels: 60000}).
+                            reproject({
+                            crs:projection2km_scale});
+// print(cropET_from_openET);                        
+
+// saving to drive
+Export.image.toDrive({  
+ image: cropET_from_openET,  
+ description: 'cropET_from_openET',  
+ scale: 2000,  
+ region: central_valley,  
+ fileFormat: 'GeoTIFF',  
+ maxPixels: 1e12,  
+ formatOptions: {  
+    cloudOptimized: true  
+  }  
+}); 
+
+//  Mapping
+var vis1 = {min:1, max:1, palette: ['lightgreen']};
+var vis2 = {min:0, max:500, palette: ['grey', 'blue']};
+var vis3 = {min: 0, max: 1400,  palette: ['9e6212', 'ac7d1d', 'ba9829', 'c8b434', 'd6cf40', 'bed44b', '9fcb51',
+                                          '80c256', '61b95c', '42b062', '45b677', '49bc8d', '4dc2a2', '51c8b8',
+                                          '55cece', '4db4ba', '459aa7', '3d8094', '356681', '2d4c6e']};
+
+Map.setCenter(-119.761, 36.3434);
+Map.addLayer(irr_mask.clip(central_valley) , vis1, year+' IrrMapper Irrigated Extent', false);
+Map.addLayer(cropET_from_openET, vis2, 'cropET from OpenET'); //  Not sure why the cropET map is tilted

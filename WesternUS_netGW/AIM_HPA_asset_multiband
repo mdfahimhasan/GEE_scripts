@@ -1,0 +1,93 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var aim2000 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2000_AIM-HPA"),
+    aim2001 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2001_AIM-HPA"),
+    aim2002 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2002_AIM-HPA"),
+    aim2003 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2003_AIM-HPA"),
+    aim2004 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2004_AIM-HPA"),
+    aim2005 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2005_AIM-HPA"),
+    aim2006 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2006_AIM-HPA"),
+    aim2007 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2007_AIM-HPA"),
+    aim2008 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2008_AIM-HPA"),
+    aim2009 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2009_AIM-HPA"),
+    aim2010 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2010_AIM-HPA"),
+    aim2011 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2011_AIM-HPA"),
+    aim2012 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2012_AIM-HPA"),
+    aim2013 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2013_AIM-HPA"),
+    aim2014 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2014_AIM-HPA"),
+    aim2015 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2015_AIM-HPA"),
+    aim2016 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2016_AIM-HPA"),
+    aim2017 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2017_AIM-HPA"),
+    aim2018 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2017_AIM-HPA"),
+    aim2019 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2017_AIM-HPA"),
+    aim2020 = ee.Image("projects/ee-fahim/assets/AIM-HPA/2017_AIM-HPA");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//  Renaming bands
+var aim2000 = aim2000.select('b1').rename('aim_2000');
+var aim2001 = aim2001.select('b1').rename('aim_2001');
+var aim2002 = aim2002.select('b1').rename('aim_2002');
+var aim2003 = aim2003.select('b1').rename('aim_2003');
+var aim2004 = aim2004.select('b1').rename('aim_2004');
+var aim2005 = aim2005.select('b1').rename('aim_2005');
+var aim2006 = aim2006.select('b1').rename('aim_2006');
+var aim2007 = aim2007.select('b1').rename('aim_2007');
+var aim2008 = aim2008.select('b1').rename('aim_2008');
+var aim2009 = aim2009.select('b1').rename('aim_2009');
+var aim2010 = aim2010.select('b1').rename('aim_2010');
+var aim2011 = aim2011.select('b1').rename('aim_2011');
+var aim2012 = aim2012.select('b1').rename('aim_2012');
+var aim2013 = aim2013.select('b1').rename('aim_2013');
+var aim2014 = aim2014.select('b1').rename('aim_2014');
+var aim2015 = aim2015.select('b1').rename('aim_2015');
+var aim2016 = aim2016.select('b1').rename('aim_2016');
+var aim2017 = aim2017.select('b1').rename('aim_2017');
+var aim2018 = aim2018.select('b1').rename('aim_2018');
+var aim2019 = aim2019.select('b1').rename('aim_2019');
+var aim2020 = aim2020.select('b1').rename('aim_2020');
+
+// Making all annual images to image collection
+var AIM_imagecollection = ee.ImageCollection
+                            .fromImages([aim2000, aim2001, aim2002, aim2003,
+                                         aim2004, aim2005, aim2006, aim2007, 
+                                         aim2008, aim2009, aim2010, aim2011, 
+                                         aim2012, aim2013, aim2014, aim2015, 
+                                         aim2016, aim2017, aim2018, aim2019, 
+                                         aim2020]);
+// print(AIM_imagecollection);
+
+// Converting the annual ImageCollection to a multi-band Image and Renaming
+var AIM_HPA_multiband_annual_image = AIM_imagecollection.toBands();
+var AIM_HPA_multiband_annual_image = AIM_HPA_multiband_annual_image
+                                   .select(['0_aim_2000', '1_aim_2001', '2_aim_2002', '3_aim_2003',
+                                            '4_aim_2004', '5_aim_2005', '6_aim_2006', '7_aim_2007', 
+                                            '8_aim_2008', '9_aim_2009', '10_aim_2010', '11_aim_2011', 
+                                            '12_aim_2012', '13_aim_2013', '14_aim_2014', '15_aim_2015',
+                                            '16_aim_2016', '17_aim_2017', '18_aim_2018', '19_aim_2019', 
+                                            '20_aim_2020'])
+                                    .rename(['aim_2000', 'aim_2001', 'aim_2002', 'aim_2003',
+                                             'aim_2004', 'aim_2005', 'aim_2006', 'aim_2007', 
+                                             'aim_2008', 'aim_2009', 'aim_2010', 'aim_2011', 
+                                             'aim_2012', 'aim_2013', 'aim_2014', 'aim_2015',
+                                             'aim_2016', 'aim_2017', 'aim_2018', 'aim_2019', 
+                                             'aim_2020']);
+
+print(AIM_HPA_multiband_annual_image);
+
+// // Export the multi-band image to an Earth Engine asset.
+// Export.image.toAsset({
+//   image: AIM_HPA_multiband_annual_image,
+//   description: 'AIM_HPA_multiband_image',
+//   assetId: 'projects/ee-fahim/assets/AIM_HPA_Annual',
+//   scale: 30,
+//   crs: 'EPSG:4326',
+//   maxPixels:  1200000000000
+// });
+
+var irrig_AIM_HPA = ee.Image('projects/ee-fahim/assets/AIM-HPA/AIM_HPA_Annual');
+var irrig_HPA_2016 = irrig_AIM_HPA.select('aim_2016');
+var irrig_HPA_2016 = irrig_HPA_2016.eq(1);
+var irrig_HPA_2016 = irrig_HPA_2016.updateMask(irrig_HPA_2016);
+
+var vis = {min:1, max:1, palette: ['blue']};
+
+Map.setCenter(-97.768, 41.163, 8);
+Map.addLayer(irrig_HPA_2016, vis, 'AIM-HPA-2016');

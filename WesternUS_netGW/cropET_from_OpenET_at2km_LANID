@@ -1,0 +1,89 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geom_NE = 
+    /* color: #ffc82d */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-98.36794112130335, 41.178559450540135],
+          [-98.36794112130335, 40.46357077836162],
+          [-97.60988448067835, 40.46357077836162],
+          [-97.60988448067835, 41.178559450540135]]], null, false),
+    lanid = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_Annual_LANID"),
+    aim_hpa = ee.Image("projects/ee-fahim/assets/AIM-HPA/AIM_HPA_Annual");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// LANID Image for 2016
+var irr_lanid = lanid.select('lanid_2016');
+var irr_lanid = irr_lanid.eq(1).unmask(); // unmask() assigns zero value to no data pixels
+
+var projection_lanid = irr_lanid.projection();
+var projection2km_scale = projection_lanid.atScale(2200); // from LANID
+// print(projection_lanid);
+
+
+// AIM HPA data 2006
+var irr_aim_hpa = aim_hpa.select('aim_2016');
+var irr_aim_hpa = irr_aim_hpa.eq(1).unmask();
+
+// Joining LANID and AIM-HPA
+// The equal operation (with 0) sets non-irrigated locations to 1 and irrigated to 0
+// Remapping the irrigated 0 values to 1 and then applying a mask
+var irr_total = irr_lanid.add(irr_aim_hpa);
+var irr_total = irr_total.eq(0).remap([0], [1]);
+var irr_total = irr_total.updateMask(irr_total);
+
+
+// Mapping
+var vis0_0 = {min:0, max:1, palette: ['green']};
+var vis0_1 = {min:1, max:1, palette: ['blue']};
+var vis0_2 = {min:1, max:1, palette: ['orange']};
+
+var irr_lanid_for_vis = irr_lanid.updateMask(irr_lanid.eq(1)); // only needed at this place for visualization
+var irr_aim_hpa_for_vis = irr_aim_hpa.updateMask(irr_aim_hpa.eq(1)); // only needed at this place for visualization
+
+Map.addLayer(irr_aim_hpa_for_vis, vis0_1, 'Irrigation AIM-HPA', false);
+Map.addLayer(irr_lanid_for_vis, vis0_0, 'Irrigation LANID', false);
+Map.addLayer(irr_total, vis0_2, 'Irrigation LANID + AIM-HPA', false);
+
+
+// Open ET Imagecollection
+var openET_imcol = ee.ImageCollection("OpenET/ENSEMBLE/CONUS/GRIDMET/MONTHLY/v2_0");
+
+var projection_openET = ee.Image(openET_imcol.first()).projection();
+// var projection2km_scale = projection_openET.atScale(2000);  // from OpenET
+
+var openET_img = openET_imcol.select('et_ensemble_mad').
+                    filterDate('2016-06-01', '2016-07-01').
+                    sum().multiply(1).toFloat().
+                    setDefaultProjection({crs: projection_openET});
+                    
+                    
+// print(openET_img.projection());
+
+
+// Multiplying OpenET with Irrmap irrigated data. This will set non-irrigated pixels' ET value to zero
+var cropET_from_openET = openET_img.multiply(irr_total).clip(geom_NE);
+Map.addLayer(cropET_from_openET, {}, 'cropET from OpenET at 30m'); 
+
+// Summing crop ET from 30m to 2km scale
+var cropET_from_openET = cropET_from_openET.reduceResolution(
+                          {reducer:ee.Reducer.mean(), 
+                            maxPixels: 60000}).
+                            reproject({
+                            crs:projection2km_scale});
+// print(cropET_from_openET);                        
+
+//  Mapping
+var vis1 = {min:0, max:1, palette: ['lightgreen']};
+var vis2 = {min:0, max:500, palette: ['grey', 'blue']};
+var vis3 = {min: 0, max: 1400,  palette: ['9e6212', 'ac7d1d', 'ba9829', 'c8b434', 'd6cf40', 'bed44b', '9fcb51',
+                                          '80c256', '61b95c', '42b062', '45b677', '49bc8d', '4dc2a2', '51c8b8',
+                                          '55cece', '4db4ba', '459aa7', '3d8094', '356681', '2d4c6e']};
+
+Map.setCenter(-98.0146, 40.7821);
+// Map.addLayer(irr_lanid , vis1, 'IrrMapper Irrigated Fields');
+Map.addLayer(openET_img, vis3, 'OpenET Raw', false);
+Map.addLayer(cropET_from_openET, vis2, 'cropET from OpenET at 2km');

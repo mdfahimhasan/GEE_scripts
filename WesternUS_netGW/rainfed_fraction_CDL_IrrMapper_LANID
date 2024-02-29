@@ -1,0 +1,157 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var LANID = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_Annual_LANID"),
+    central_valley = 
+    /* color: #35d639 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-120.5679321639884, 35.83958685315306],
+          [-120.5679321639884, 35.616620378663015],
+          [-120.2163696639884, 35.616620378663015],
+          [-120.2163696639884, 35.83958685315306]]], null, false),
+    HPA = 
+    /* color: #5bffef */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-99.79048831918108, 40.948602517305474],
+          [-99.79048831918108, 40.77411571199723],
+          [-99.59273441293108, 40.77411571199723],
+          [-99.59273441293108, 40.948602517305474]]], null, false),
+    aim_hpa = ee.Image("projects/ee-fahim/assets/AIM-HPA/AIM_HPA_Annual");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// LANID Image for 2016
+var irr_lanid = LANID.select('lanid_2016');
+var irr_lanid = irr_lanid.eq(1).unmask(); // unmask() assigns zero value to no data pixels
+
+var projection_lanid = irr_lanid.projection();
+var projection2km_scale = projection_lanid.atScale(2200); // from LANID
+// print(projection_lanid);
+
+// AIM-HPA data 2006
+var irr_aim_hpa = aim_hpa.select('aim_2016');
+var irr_aim_hpa = irr_aim_hpa.eq(1).unmask();
+
+// Joining LANID and AIM-HPA
+// Not sure why adding LANID and AIM-HPA together assigns 0 values
+// to irrigated pixels. Remapping them to 1 and applying a mask
+var irr_total_lanid = irr_lanid.add(irr_aim_hpa);
+var irr_total_lanid = irr_total_lanid.eq(0).remap([0], [1]).unmask(); 
+
+//  IrrMapper (irrigated cropland) Data. In IrrMapper, irigated areas are assigned 0 value.
+var year = 2016;
+var irr_imcol = ee.ImageCollection('projects/ee-dgketchum/assets/IrrMapper/IrrMapperComp');
+var irr = irr_imcol.filter(ee.Filter.calendarRange(year,year,'year'))
+                   .select('classification').max().rename(['irrigated']);
+
+var irrmapper_img = irr.eq(0);
+
+//  USDA CDL dataset
+var cdl_dataset = ee.ImageCollection('USDA/NASS/CDL')
+                  .filter(ee.Filter.date('2016-01-01', '2016-12-31'))
+                  .first();
+var cdl = cdl_dataset.select('cropland');
+
+// List of non-crop pixels
+var noncrop_list = ee.List([0, 60,61, 63,64,65,81, 82,83, 87, 88, 111, 112, 121, 122, 123,
+                            124, 131, 141, 142, 143, 152, 176, 190, 195]);  // 0 is no data value
+
+// Filtering out non-crop pixels
+var cdl_cropland = cdl.remap({
+  from: noncrop_list,
+  to: ee.List.repeat(0, noncrop_list.size()),
+  defaultValue: 1
+});
+
+
+// Extracting rainfed (non-irrigated) croplands
+// Converting 0 values (non-irrigated) to 1 then multiplying with
+// CDL cropland data (reclassified to 1 for croplands and 0 for non-croplands). 
+// The ramaining pixels will be rainfed croplands. Masking it again to remove the 0 values
+var irrmapper_reversed = irrmapper_img.remap([0], [1]);
+var rainfed_cropland_for_IrrMapper = cdl_cropland.multiply(irrmapper_reversed);
+var mask = rainfed_cropland_for_IrrMapper.eq(1);
+var rainfed_cropland_for_IrrMapper = rainfed_cropland_for_IrrMapper.updateMask(mask);
+
+var lanid_reversed = irr_total_lanid.remap([0, 1], [1, 0]);
+var rainfed_cropland_for_LANID = cdl_cropland.multiply(lanid_reversed);
+var mask = rainfed_cropland_for_LANID.eq(1);
+var rainfed_cropland_for_LANID = rainfed_cropland_for_LANID.updateMask(mask);
+
+// ################################# for IrrMapper Extent
+// counting number of rainfed and total pixels (30m) in a 2km pixel
+var projection_irrmapper = irr_imcol.first().projection();
+var projection2km_scale = projection_irrmapper.atScale(2200);
+
+// In Rainfed cropland-IrrMapper dataset irrigated fields are assigned as 1 and others as null
+var rainfed_pixel_count = rainfed_cropland_for_IrrMapper
+                            .reduceResolution({reducer: ee.Reducer.count(),
+                                               maxPixels: 60000}).
+                                               reproject({
+                                               crs:projection2km_scale});
+
+// In IrrMapper dataset irrigated fields are assigned as 0
+// Converting the irrigated values to 1 and setting others as 0
+var rainfed_with_total = rainfed_cropland_for_IrrMapper.unmask();
+
+var total_pixel_count = rainfed_with_total.reduceResolution(
+                          {reducer: ee.Reducer.count(),
+                            maxPixels: 60000}).
+                            reproject({
+                            crs:projection2km_scale});
+                            
+// counting fraction of irrigated lands in a pixel
+var rainfed_frac_IrrMapper = rainfed_pixel_count.divide(total_pixel_count).clip(central_valley); 
+// #################################
+
+// ################################# for LANID Extent
+// counting number of rainfed and total pixels (30m) in a 2km pixel
+var projection_lanid = irr_lanid.projection();
+var projection2km_scale = projection_lanid.atScale(2200);
+
+// In Rainfed cropland-LANID dataset irrigated fields are assigned as 1 and others as null
+var rainfed_pixel_count = rainfed_cropland_for_LANID
+                            .reduceResolution({reducer: ee.Reducer.count(),
+                                               maxPixels: 60000}).
+                                               reproject({
+                                               crs:projection2km_scale});
+
+// In LANID dataset irrigated fields are assigned as 0
+// Converting the irrigated values to 1 and setting others as 0
+var rainfed_with_total = rainfed_cropland_for_LANID.unmask();
+                        
+
+var total_pixel_count = rainfed_with_total.reduceResolution(
+                          {reducer: ee.Reducer.count(),
+                            maxPixels: 60000}).
+                            reproject({
+                            crs:projection2km_scale});
+                            
+// counting fraction of irrigated lands in a pixel
+var rainfed_frac_LANID = rainfed_pixel_count.divide(total_pixel_count).clip(HPA); 
+// #################################
+
+
+// Mapping
+var vis1 = {min:0, max:1, palette: ['lightgrey', 'blue']};
+var vis2 = {min:0, max:1, palette: ['lightgrey', 'green']};
+var vis3 = {min:0, max:1, palette: ['yellow', 'red']};
+var vis4 = {min: 0, max: 1, palette: ['green', 'yellow', 'blue']};
+
+// Map.setCenter(-100.55, 40.71, 4);
+Map.addLayer(cdl, {}, 'Crop Landcover', false);
+Map.addLayer(cdl_cropland, vis2, 'Cropland filtered', false);
+Map.addLayer(irrmapper_img , vis1, 'IrrMapper Irrigated Extent', false);
+Map.addLayer(irr_total_lanid , vis1, 'LANID Irrigated Extent', false);
+Map.addLayer(rainfed_cropland_for_IrrMapper, vis3, 'Rainfed cropland IrrMapper Extent');
+Map.addLayer(rainfed_cropland_for_LANID, vis3, 'Rainfed cropland LANID Extent');
+Map.addLayer(rainfed_frac_IrrMapper, vis4, 'Rainfed fraction-IrrMapper in 2km pixel');
+Map.addLayer(rainfed_frac_LANID, vis4, 'Rainfed fraction-LANID in 2km pixel');

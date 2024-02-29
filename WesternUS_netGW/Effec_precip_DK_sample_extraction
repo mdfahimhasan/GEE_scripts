@@ -1,0 +1,159 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var snake_basin = 
+    /* color: #50d6c9 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      },
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.MultiPolygon(
+        [[[[-115.07347240879255, 40.85051182309983],
+           [-115.07347240879255, 38.689071330149694],
+           [-115.07347240879255, 38.689071330149694],
+           [-115.07347240879255, 40.85051182309983]]],
+         [[[-117.9694013353793, 44.66487770043994],
+           [-117.9694013353793, 41.94737210862421],
+           [-111.2018232103793, 41.94737210862421],
+           [-111.2018232103793, 44.66487770043994]]]], null, false),
+    Effec_precip_DK_extent = 
+    /* color: #cfd62c */
+    /* shown: false */
+    ee.Geometry.Polygon(
+        [[[-121.37729075246698, 43.291547583267736],
+          [-121.02572825246698, 43.6105727327024],
+          [-120.10287668996698, 43.41935957677398],
+          [-119.70736887746698, 43.674175797430046],
+          [-119.13607981496698, 43.92791459994046],
+          [-118.69662668996698, 43.5787459503943],
+          [-118.69662668996698, 43.09932493124571],
+          [-117.59799387746698, 41.90058700159656],
+          [-116.32357981496698, 41.110758006718946],
+          [-113.68686106496698, 41.605530386558634],
+          [-111.35775950246698, 42.35686600788142],
+          [-106.96322825246698, 42.648451711373774],
+          [-105.77670481496698, 43.51504189048004],
+          [-104.9213323978136, 44.71390015924376],
+          [-103.47850236592222, 49.01472703930666],
+          [-121.10057267842222, 49.04354088917793],
+          [-121.80369767842222, 46.956169474505124],
+          [-123.95701799092222, 46.383224386756936],
+          [-123.78123674092222, 44.4713268992622],
+          [-122.46287736592222, 43.26750801716667],
+          [-123.69334611592222, 41.87600490105711],
+          [-123.16600236592222, 41.284309852900535],
+          [-121.14451799092222, 41.54795470987956],
+          [-120.44139299092222, 42.16981779071898],
+          [-121.23240861592222, 43.01097551427713]]]),
+    trainZone4 = ee.FeatureCollection("projects/ee-fahim/assets/training_zone_4"),
+    trainZone9 = ee.FeatureCollection("projects/ee-fahim/assets/training_zone_9"),
+    trainZone10 = ee.FeatureCollection("projects/ee-fahim/assets/training_zone_10"),
+    trainZone11 = ee.FeatureCollection("projects/ee-fahim/assets/training_zone_11"),
+    trainZone12 = ee.FeatureCollection("projects/ee-fahim/assets/training_zone_12"),
+    trainZone13 = ee.FeatureCollection("projects/ee-fahim/assets/training_zone_13"),
+    trainZone14 = ee.FeatureCollection("projects/ee-fahim/assets/training_zone_14");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//  The ept data asset was taken from David Ketchum. Unit in m/month
+// Note: The data is available from 1987-2021 for months 4-10
+var ept_col = ee.ImageCollection('users/dgketchum/expansion/ept');
+var ept = ee.Image('users/dgketchum/expansion/ept/ept_image_full_stack_2016_et_6');
+var ept = ept.multiply(1000);  // converting to mm/month
+
+// Open ET
+var openET_imcol = ee.ImageCollection("OpenET/ENSEMBLE/CONUS/GRIDMET/MONTHLY/v2_0");
+
+var openET_img = openET_imcol.select('et_ensemble_mad').
+                    filterDate('2016-06-01', '2016-07-01').
+                    sum().multiply(1).toFloat();
+
+var openET_proj = openET_imcol.select('et_ensemble_mad').first().projection();
+
+
+// Irrmapper Imagecollection filtering
+var year = 2016;
+
+var irrmap_imcol = ee.ImageCollection('projects/ee-dgketchum/assets/IrrMapper/IrrMapperComp');
+var irrmap = irrmap_imcol.filter(ee.Filter.calendarRange(year,year,'year'))
+    .select('classification').max().rename(['irrigated']);
+
+// In IrrMapper dataset irrigated fields are assigned as 0
+// Converting the irrigated values to 1 and setting others as null
+var irrmap = irrmap.eq(0);
+                          
+//  USDA CDL dataset
+var cdl_dataset = ee.ImageCollection('USDA/NASS/CDL')
+                  .filter(ee.Filter.date('2016-01-01', '2016-12-31'))
+                  .first();
+var cdl = cdl_dataset.select('cropland');
+
+// List of non-crop pixels
+var noncrop_list = ee.List([0, 60,61, 63,64,65,81, 82,83, 87, 88, 111, 112, 121, 122, 123,
+                            124, 131, 141, 142, 143, 152, 190, 195]);  // 0 is no data value
+
+// Filtering out non-crop pixels
+var cdl_cropland = cdl.remap({
+  from: noncrop_list,
+  to: ee.List.repeat(0, noncrop_list.size()),
+  defaultValue: 1
+});
+
+
+// Extracting rainfed (non-irrigated) croplands
+// Converting 0 values (non-irrigated) to 1 then multiplying with
+// CDL cropland data (reclassified to 1 for croplands and 0 for non-croplands). 
+// The ramaining pixels will be rainfed croplands. Masking it again to remove the 0 values
+var irrmapper_reversed = irrmap.remap([0], [1]);
+var rainfed_cropland_for_IrrMapper = cdl_cropland.multiply(irrmapper_reversed);
+var mask = rainfed_cropland_for_IrrMapper.eq(1);
+
+var rainfed_cropland_for_IrrMapper = rainfed_cropland_for_IrrMapper
+                                          .updateMask(mask)
+                                          .setDefaultProjection(openET_proj);
+
+// Creating randomized points where openET_irr has value 1
+var rndm_points = rainfed_cropland_for_IrrMapper 
+              .stratifiedSample({numPoints: 200, 
+                                 region:trainZone14, 
+                                 geometries: true});
+
+// Extracting openET pixel value for random points
+var rndm_points_with_openET = openET_img.sampleRegions(
+                                {collection: rndm_points, 
+                                scale: 30,
+                                geometries: true 
+                                });
+                            
+// Extracting effective precip pixel value for random points
+var rndm_points_with_openET_EP = ept.sampleRegions(
+                                {collection: rndm_points_with_openET, 
+                                scale: 30,
+                                geometries: true 
+                                });
+print(rndm_points_with_openET_EP)
+
+// //  Mapping
+var vis1 = {min: 0, max: 1, paletter: ['blue', 'green']};
+var vis2 = {
+  min: 0,
+  max: 300,
+  palette: [
+    '9e6212', 'ac7d1d', 'ba9829', 'c8b434', 'd6cf40', 'bed44b', '9fcb51',
+    '80c256', '61b95c', '42b062', '45b677', '49bc8d', '4dc2a2', '51c8b8',
+    '55cece', '4db4ba', '459aa7', '3d8094', '356681', '2d4c6e',
+  ]
+};
+
+Map.addLayer(ept, vis2, 'Effective Precip D. K.', false);
+Map.addLayer(rainfed_cropland_for_IrrMapper, vis1, year +' Rainfed croplands');
+Map.addLayer(rndm_points_with_openET_EP, {color: 'green'}, 'Random Points on Rainfed');
+
+// Export the sampled points to Google Drive as a shapefile
+Export.table.toDrive({
+  collection: rndm_points_with_openET_EP,
+  description: 'sampled_points_trainZone14', // Adjust the export name as needed
+  folder: 'GEE', // Replace with your desired folder name in Google Drive
+  fileFormat: 'SHP'
+});

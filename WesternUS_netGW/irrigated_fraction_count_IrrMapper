@@ -1,0 +1,64 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var CV = 
+    /* color: #98ff00 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-119.66664808712096, 36.11039573241992],
+          [-119.66664808712096, 35.66536072381116],
+          [-119.12831800899596, 35.66536072381116],
+          [-119.12831800899596, 36.11039573241992]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var year = 2016;
+
+// Imagecollection filtering
+var irrmap_imcol = ee.ImageCollection('projects/ee-dgketchum/assets/IrrMapper/IrrMapperComp');
+var irrmap = irrmap_imcol.filter(ee.Filter.calendarRange(year,year,'year'))
+    .select('classification').max().rename(['irrigated']).clip(CV);
+    
+// counting number of irrigated and total pixels (30m) in a 2km pixel
+var projection_irrmap = ee.Image(irrmap_imcol.first()).projection();
+var projection2km_scale = projection_irrmap.atScale(2000);
+
+// In IrrMapper dataset irrigated fields are assigned as 0
+// Converting the irrigated values to 1 and setting others as null
+var mask = irrmap.eq(0);
+var irr_mask_only = irrmap.updateMask(mask).remap([0],[1])
+                    .setDefaultProjection({crs: projection_irrmap});  
+
+var irr_pixel_count = irr_mask_only.reduceResolution(
+                          {reducer: ee.Reducer.count(),
+                            maxPixels: 60000}).
+                            reproject({
+                            crs:projection2km_scale});
+
+// In IrrMapper dataset irrigated fields are assigned as 0
+// Converting the irrigated values to 1 and setting others as 0
+var irr_mask_with_total = irrmap.eq(0)
+                          .setDefaultProjection({crs: projection_irrmap}).unmask();
+
+var total_pixel_count = irr_mask_with_total.reduceResolution(
+                          {reducer: ee.Reducer.count(),
+                            maxPixels: 60000}).
+                            reproject({
+                            crs:projection2km_scale});
+                            
+// counting fraction of irrigated lands in a pixel
+var irrig_frac = irr_pixel_count.divide(total_pixel_count);
+
+
+
+//  Mapping
+var vis1 = {min:0, max:300, palette: ['grey', 'blue', 'green']};
+var vis2 = {min:0, max:5000, palette: ['lightgrey']};
+var vis3 = {min: 0, max: 1, palette: ['green', 'yellow', 'blue']};
+var vis4 = {min: 1, max: 1, paletter: ['blue']};
+
+Map.addLayer(irr_pixel_count , vis1, year+'Irrigated pixel count', false);
+Map.addLayer(total_pixel_count , vis2, year+'Total pixel count', false);
+Map.addLayer(irrig_frac , vis3, year+'Irrig Frac');
+Map.addLayer(irr_mask_only, vis4, year+'Irrigated lands', false);

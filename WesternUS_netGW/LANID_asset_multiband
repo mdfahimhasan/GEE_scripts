@@ -1,0 +1,83 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var lanid2000 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2000"),
+    lanid2001 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2001"),
+    lanid2002 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2002"),
+    lanid2003 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2003"),
+    lanid2004 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2004"),
+    lanid2005 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2005"),
+    lanid2006 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2006"),
+    lanid2007 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2007"),
+    lanid2008 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2008"),
+    lanid2009 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2009"),
+    lanid2010 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2010"),
+    lanid2011 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2011"),
+    lanid2012 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2012"),
+    lanid2013 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2013"),
+    lanid2014 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2014"),
+    lanid2015 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2015"),
+    lanid2016 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2016"),
+    lanid2017 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2017"),
+    lanid2018 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2017"),
+    lanid2019 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2017"),
+    lanid2020 = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_LANID_2017");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//  Renaming bands
+var lanid2000 = lanid2000.select('b1').rename('lanid_2000');
+var lanid2001 = lanid2001.select('b1').rename('lanid_2001');
+var lanid2002 = lanid2002.select('b1').rename('lanid_2002');
+var lanid2003 = lanid2003.select('b1').rename('lanid_2003');
+var lanid2004 = lanid2004.select('b1').rename('lanid_2004');
+var lanid2005 = lanid2005.select('b1').rename('lanid_2005');
+var lanid2006 = lanid2006.select('b1').rename('lanid_2006');
+var lanid2007 = lanid2007.select('b1').rename('lanid_2007');
+var lanid2008 = lanid2008.select('b1').rename('lanid_2008');
+var lanid2009 = lanid2009.select('b1').rename('lanid_2009');
+var lanid2010 = lanid2010.select('b1').rename('lanid_2010');
+var lanid2011 = lanid2011.select('b1').rename('lanid_2011');
+var lanid2012 = lanid2012.select('b1').rename('lanid_2012');
+var lanid2013 = lanid2013.select('b1').rename('lanid_2013');
+var lanid2014 = lanid2014.select('b1').rename('lanid_2014');
+var lanid2015 = lanid2015.select('b1').rename('lanid_2015');
+var lanid2016 = lanid2016.select('b1').rename('lanid_2016');
+var lanid2017 = lanid2017.select('b1').rename('lanid_2017');
+var lanid2018 = lanid2018.select('b1').rename('lanid_2018');
+var lanid2019 = lanid2019.select('b1').rename('lanid_2019');
+var lanid2020 = lanid2020.select('b1').rename('lanid_2020');
+
+// Making all annual images to image collection
+var LANID_imagecollection = ee.ImageCollection
+                            .fromImages([lanid2000, lanid2001, lanid2002, lanid2003,
+                                         lanid2004, lanid2005, lanid2006, lanid2007, 
+                                         lanid2008, lanid2009, lanid2010, lanid2011, 
+                                         lanid2012, lanid2013, lanid2014, lanid2015, 
+                                         lanid2016, lanid2017, lanid2018, lanid2019, 
+                                         lanid2020]);
+// print(LANID_imagecollection);
+
+// Converting the annual ImageCollection to a multi-band Image and Renaming
+var LAIND_multiband_annual_image = LANID_imagecollection.toBands();
+var LAIND_multiband_annual_image = LAIND_multiband_annual_image
+                                   .select(['0_lanid_2000', '1_lanid_2001', '2_lanid_2002', '3_lanid_2003',
+                                            '4_lanid_2004', '5_lanid_2005', '6_lanid_2006', '7_lanid_2007', 
+                                            '8_lanid_2008', '9_lanid_2009', '10_lanid_2010', '11_lanid_2011', 
+                                            '12_lanid_2012', '13_lanid_2013', '14_lanid_2014', '15_lanid_2015',
+                                            '16_lanid_2016', '17_lanid_2017', '18_lanid_2018', '19_lanid_2019', 
+                                            '20_lanid_2020'])
+                                    .rename(['lanid_2000', 'lanid_2001', 'lanid_2002', 'lanid_2003',
+                                             'lanid_2004', 'lanid_2005', 'lanid_2006', 'lanid_2007', 
+                                             'lanid_2008', 'lanid_2009', 'lanid_2010', 'lanid_2011', 
+                                             'lanid_2012', 'lanid_2013', 'lanid_2014', 'lanid_2015',
+                                             'lanid_2016', 'lanid_2017', 'lanid_2018', 'lanid_2019', 
+                                             'lanid_2020']);
+
+print(LAIND_multiband_annual_image);
+
+// Export the multi-band image to an Earth Engine asset.
+Export.image.toAsset({
+  image: LAIND_multiband_annual_image,
+  description: 'LANID_multiband_image',
+  assetId: 'projects/ee-fahim/assets/selected_Annual_LANID',
+  scale: 30,
+  crs: 'EPSG:4326',
+  maxPixels:  12000000000
+});

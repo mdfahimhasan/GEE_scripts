@@ -1,0 +1,78 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var WestUS = 
+    /* color: #91d68c */
+    /* shown: false */
+    ee.Geometry.Polygon(
+        [[[-111.89687478404971, 49.45262336990672],
+          [-126.48671853404971, 49.50972571178583],
+          [-126.13515603404971, 46.813815100854484],
+          [-124.98371681550096, 38.61180241243832],
+          [-120.81989635649289, 34.15007654250315],
+          [-117.56794323149289, 32.38653459694597],
+          [-111.95056491961937, 31.38229794191201],
+          [-108.52283054461937, 30.89331932095708],
+          [-107.95154148211937, 31.60712763239944],
+          [-106.58923679461937, 31.569693570360503],
+          [-104.87536960711937, 29.41142011969381],
+          [-103.07361179461937, 28.79707915685322],
+          [-102.37048679461937, 29.41142011969381],
+          [-100.92029148211937, 28.527156707839016],
+          [-98.54724460711937, 26.185563958895493],
+          [-96.87732273211937, 25.55290229076818],
+          [-95.64685398211937, 28.758561394583513],
+          [-93.53747898211937, 29.449694370901742],
+          [-94.32849460711937, 35.09344288769564],
+          [-94.24060398211937, 38.608761129549315],
+          [-95.29529148211937, 40.03649212856553],
+          [-96.43786960711937, 42.99705709145251],
+          [-96.43786960711937, 46.43070437717679],
+          [-97.31677585711937, 49.26103205217076]]]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//  USDA CDL dataset
+var cdl_dataset = ee.ImageCollection('USDA/NASS/CDL')
+                  .filter(ee.Filter.date('2016-01-01', '2026-12-31'))
+                  .first();
+var cdl = cdl_dataset.select('cropland');
+
+// List of non-crop pixels
+var noncrop_list = ee.List([60,61, 63,64,65,81, 82,83, 87, 88, 111, 112, 121, 122, 123,
+                            124, 131, 141, 142, 143, 152, 190, 195]);  // 0 is no data value
+
+// Filtering out non-crop pixels
+var cdl_mask = cdl.remap({
+  from: noncrop_list,
+  to: ee.List.repeat(0, noncrop_list.size()),
+  defaultValue:1
+});
+
+var cdl_cropland = cdl.updateMask(cdl_mask);
+
+
+var cdl_cultivated = ee.ImageCollection('USDA/NASS/CDL')
+                  .filter(ee.Filter.date('2016-01-01', '2016-12-31'))
+                  .select('cultivated').first();
+var cdl_cultivated = cdl_cultivated.eq(2);  // only selecting cultivated
+var cdl_cultivated = cdl_cultivated.updateMask(cdl_cultivated);
+
+
+
+// OpenET
+var openET_imcol = ee.ImageCollection("OpenET/ENSEMBLE/CONUS/GRIDMET/MONTHLY/v2_0");
+
+var openET_img = openET_imcol.select('et_ensemble_mad').
+                    filterDate('2016-06-01', '2016-07-01').
+                    sum().multiply(1).toFloat();
+
+
+var vis_et = {
+  min: 0,
+  max: 1400,
+  palette: [
+    '9e6212', 'ac7d1d', 'ba9829', 'c8b434', 'd6cf40', 'bed44b', '9fcb51',
+    '80c256', '61b95c', '42b062', '45b677', '49bc8d', '4dc2a2', '51c8b8',
+    '55cece', '4db4ba', '459aa7', '3d8094', '356681', '2d4c6e',
+  ]
+};
+Map.addLayer(cdl_cropland.clip(WestUS), {}, 'Crop Landcover');
+Map.addLayer(cdl_cultivated.clip(WestUS), {}, 'Crop cultivated');
+Map.addLayer(openET_img.clip(WestUS), vis_et, 'OpenET');

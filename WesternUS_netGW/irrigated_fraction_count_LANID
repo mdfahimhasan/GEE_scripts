@@ -1,0 +1,79 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var geom_NE = 
+    /* color: #cdd94f */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[-100.09321306578559, 41.44875515503795],
+          [-100.09321306578559, 39.67956066120459],
+          [-95.10542009703559, 39.67956066120459],
+          [-95.10542009703559, 41.44875515503795]]], null, false),
+    lanid = ee.Image("projects/ee-fahim/assets/LANID_for_selected_states/selected_Annual_LANID"),
+    aim_hpa = ee.Image("projects/ee-fahim/assets/AIM-HPA/AIM_HPA_Annual");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// LANID Image for 2016
+var irr_lanid = lanid.select('lanid_2016');
+var irr_lanid = irr_lanid.eq(1).unmask(); // unmask() assigns zero value to no data pixels
+// Map.addLayer(lanid.select('lanid_2016').eq(1).clip(geom_NE), {min:1, max:1, palette:['blue']}, 'Irrigated LANID');
+
+var projection_lanid = irr_lanid.projection();
+var projection2km_scale = projection_lanid.atScale(2200); // from LANID
+// print(projection_lanid);
+
+
+// AIM HPA data 2006
+var irr_aim_hpa = aim_hpa.select('aim_2016');
+var irr_aim_hpa = irr_aim_hpa.eq(1).unmask();
+
+// var aim_for_vis = irr_aim_hpa.eq(1)
+// var aim_for_vis = aim_for_vis.updateMask(aim_for_vis)
+// Map.addLayer(aim_for_vis.clip(geom_NE), {min:1, max:1, palette:['orange']}, 'Irrigated AIM-HPA');
+
+// Joining LANID and AIM-HPA
+// The equal operation (with 0) sets non-irrigated locations to 1 and irrigated to 0
+// Remapping the irrigated 0 values to 1 and then applying a mask
+var irr_total = irr_lanid.add(irr_aim_hpa);
+var irr_total = irr_total.eq(0).remap([0], [1]);
+var irr_total = irr_total.updateMask(irr_total);
+
+Map.addLayer(irr_total.clip(geom_NE), {min:0, max:1, palette:['green']}, 'Irrigated LANID + AIm-HPA');
+
+
+// // In LANID dataset irrigated fields are assigned as 1
+var irr_total = irr_total.setDefaultProjection({crs: projection_lanid});  
+var irr_pixel_count = irr_total.reduceResolution(
+                          {reducer: ee.Reducer.count(),
+                           maxPixels: 60000}).
+                           reproject({
+                           crs:projection2km_scale});
+                         
+
+// In irrigated (LANID + AIM-HPA) dataset irrigated fields are assigned as 1
+// Unmaksing to keep irrigated values to 1 and setting others as 0
+var irr_data_with_total = irr_total
+                          // .setDefaultProjection({crs: projection_lanid})
+                          .unmask().clip(geom_NE);
+var total_pixel_count = irr_data_with_total.reduceResolution(
+                          {reducer: ee.Reducer.count(),
+                            maxPixels: 60000}).
+                            reproject({
+                            crs:projection2km_scale});
+                            
+// counting fraction of irrigated lands in a pixel
+var irrig_frac = irr_pixel_count.divide(total_pixel_count);
+
+
+// Mapping
+var vis1 = {min:0, max:5000, palette: ['grey', 'blue', 'green']};
+var vis2 = {min:0, max:5000, palette: ['lightgrey']};
+var vis3 = {min: 0, max: 1, palette: ['green', 'yellow', 'blue']};
+var vis4 = {min: 1, max: 1, paletter: ['blue']};
+
+// Map.setCenter(-98.344, 40.859, 7);
+Map.addLayer(irrig_frac, vis3, 'Irrigated Pixel Fraction in 2km pixel', false);
+Map.addLayer(irr_pixel_count, vis1, '30m Irrigated Pixel count in 2km pixel', false);
+Map.addLayer(total_pixel_count, vis2, 'Total 30m pixel count in 2km pixel', false);
